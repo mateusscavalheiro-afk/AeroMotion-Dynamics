@@ -1,0 +1,5 @@
+dados_sensores_aeromotion_tratado.csv
+modelo_gradient_boosting.joblib
+modelo_isolation_forest.joblib
+modelo_random_forest.joblib
+scaler_robust.joblib
