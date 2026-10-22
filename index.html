@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AeroMotion Dynamics - Bancada Multimodal 4.0</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            scada: {
+              bg: '#070b14',
+              panel: '#0d1527',
+              card: '#131e36',
+              border: '#1f2e4d',
+              borderLight: '#2c3e66',
+              accent: '#38bdf8',
+              emerald: '#10b981',
+              amber: '#f59e0b',
+              rose: '#f43f5e'
+            }
+          },
+          fontFamily: {
+            mono: ['Consolas', 'Courier New', 'monospace', 'ui-monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Estilos SCADA Industrial */
+    body {
+      background-color: #070b14;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    input[type=range] {
+      accent-color: #38bdf8;
+    }
+    .canvas-viewport {
+      background: radial-gradient(circle at center, #131e36 0%, #070b14 100%);
+      border: 1px solid #1f2e4d;
+    }
+    .scada-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .scada-scrollbar::-webkit-scrollbar-thumb {
+      background: #2c3e66;
+      border-radius: 4px;
+    }
+    .scada-scrollbar::-webkit-scrollbar-track {
+      background: #0d1527;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-3 md:p-6 antialiased">
+
+  <!-- CABEÇALHO DO SISTEMA SCADA -->
+  <header class="max-w-7xl mx-auto mb-6 bg-scada-panel border border-scada-border rounded-xl p-4 md:p-6 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div class="flex items-center gap-4">
+      <div class="w-12 h-12 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 text-2xl shadow-inner">
+        <i class="fa-solid fa-gauge-high animate-pulse"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-3 flex-wrap">
+          <h1 class="text-xl md:text-2xl font-bold tracking-tight text-white uppercase font-mono">AeroMotion Dynamics</h1>
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-500/15 text-sky-400 border border-sky-500/30 font-mono">
+            Bancada Multimodal 4.0
+          </span>
+        </div>
+        <p class="text-xs md:text-sm text-slate-400">Auditoria Óptica de Conjuntos Mecânicos (3 ROIs) & Telemetria Preditiva IoT</p>
+      </div>
+    </div>
+
+    <!-- Status e Ações Rápidas -->
+    <div class="flex items-center gap-3 flex-wrap">
+      <div class="flex items-center gap-2 bg-scada-bg px-3 py-1.5 rounded-lg border border-scada-border text-xs">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+        <span class="text-slate-300 font-mono">Unidade: <strong>BOMBA-TURB-102</strong></span>
+      </div>
+      <div class="flex items-center gap-2 bg-scada-bg px-3 py-1.5 rounded-lg border border-scada-border text-xs">
+        <i class="fa-solid fa-network-wired text-sky-400"></i>
+        <span class="text-slate-300 font-mono" id="api-status-badge">API: 127.0.0.1:8000</span>
+      </div>
+      <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 text-xs font-medium transition flex items-center gap-1.5 shadow">
+        <i class="fa-solid fa-file-pdf"></i> Imprimir Laudo
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto space-y-6">
+
+    <!-- SEÇÃO 1: VISÃO COMPUTACIONAL COM 3 ROIs -->
+    <section class="bg-scada-panel border border-scada-border rounded-xl p-5 shadow-2xl">
+      <div class="flex flex-col lg:flex-row justify-between lg:items-center pb-4 mb-4 border-b border-scada-border gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2 font-mono">
+            <i class="fa-solid fa-camera text-sky-400"></i>
+            1. Módulo Óptico Setorizado (Inspeção por Regiões de Interesse - ROIs)
+          </h2>
+          <p class="text-xs text-slate-400">Varredura de anomalias superficiais, trincas e cavitação nas 3 zonas mecânicas do motor/bomba.</p>
+        </div>
+
+        <!-- Presets Industriais Rápidos -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-xs text-slate-400 font-mono uppercase">Simular Injeção de Falha:</span>
+          <button onclick="carregarPreset('normal')" class="px-2.5 py-1 text-xs rounded bg-scada-card hover:bg-slate-700 text-emerald-400 border border-emerald-500/40 font-mono transition">
+            <i class="fa-solid fa-check"></i> Nominal
+          </button>
+          <button onclick="carregarPreset('rolamento')" class="px-2.5 py-1 text-xs rounded bg-scada-card hover:bg-slate-700 text-amber-400 border border-amber-500/40 font-mono transition">
+            <i class="fa-solid fa-circle-notch"></i> Falha Rolamento
+          </button>
+          <button onclick="carregarPreset('rotor')" class="px-2.5 py-1 text-xs rounded bg-scada-card hover:bg-slate-700 text-sky-400 border border-sky-500/40 font-mono transition">
+            <i class="fa-solid fa-arrows-spin"></i> Falha Rotor
+          </button>
+          <button onclick="carregarPreset('pas')" class="px-2.5 py-1 text-xs rounded bg-scada-card hover:bg-slate-700 text-rose-400 border border-rose-500/40 font-mono transition">
+            <i class="fa-solid fa-fan"></i> Cavitação Pás
+          </button>
+        </div>
+      </div>
+
+      <!-- Barra de Controle de Imagens e Filtros -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-lg bg-scada-bg/80 border border-scada-border mb-5">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-2">
+            <i class="fa-solid fa-image text-sky-400"></i> 1. Imagem Padrão (Gabarito)
+          </label>
+          <input type="file" id="input-gabarito" accept="image/*" class="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-sky-500/20 file:text-sky-300 hover:file:bg-sky-500/30 cursor-pointer">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-2">
+            <i class="fa-solid fa-magnifying-glass text-sky-400"></i> 2. Imagem em Teste (Inspecionada)
+          </label>
+          <input type="file" id="input-amostra" accept="image/*" class="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-sky-500/20 file:text-sky-300 hover:file:bg-sky-500/30 cursor-pointer">
+        </div>
+
+        <!-- Sensibilidade -->
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+              <i class="fa-solid fa-sliders text-sky-400"></i> Limiar de Corte (Canny)
+            </label>
+            <span id="valor-sensibilidade" class="text-xs font-mono font-bold text-sky-300 bg-sky-950 px-2 py-0.5 rounded border border-sky-800">28</span>
+          </div>
+          <input type="range" id="slider-sensibilidade" min="5" max="70" value="28" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+          <p class="text-[10px] text-slate-500 mt-1">Separa variações normais de textura de microfissuras.</p>
+        </div>
+
+        <!-- Tolerância -->
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+              <i class="fa-solid fa-percent text-rose-400"></i> Tolerância Máx. Permitida
+            </label>
+            <span id="valor-tolerancia" class="text-xs font-mono font-bold text-rose-300 bg-rose-950 px-2 py-0.5 rounded border border-rose-800">2.5%</span>
+          </div>
+          <input type="range" id="slider-tolerancia" min="0.5" max="10.0" step="0.5" value="2.5" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+          <p class="text-[10px] text-slate-500 mt-1">Limite aceitável de pixels anômalos por ROI.</p>
+        </div>
+      </div>
+
+      <!-- VISUALIZADORES CANVAS (4 PAINÉIS LADO A LADO) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <!-- 1. Gabarito com ROIs -->
+        <div class="bg-scada-card rounded-lg p-3 border border-scada-border flex flex-col">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-semibold text-slate-300 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span> 1. Gabarito Nominal (ROIs)
+            </span>
+            <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-scada-panel text-slate-400 border border-scada-border">Golden</span>
+          </div>
+          <div class="canvas-viewport rounded-lg overflow-hidden flex-1 flex items-center justify-center min-h-[220px]">
+            <canvas id="canvas-gabarito" width="300" height="220" class="max-w-full max-h-full object-contain"></canvas>
+          </div>
+        </div>
+
+        <!-- 2. Peça em Teste com Bounding Boxes -->
+        <div class="bg-scada-card rounded-lg p-3 border border-scada-border flex flex-col">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-semibold text-slate-300 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-sky-400"></span> 2. Peça em Teste (Câmera)
+            </span>
+            <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-scada-panel text-slate-400 border border-scada-border">Amostra</span>
+          </div>
+          <div class="canvas-viewport rounded-lg overflow-hidden flex-1 flex items-center justify-center min-h-[220px]">
+            <canvas id="canvas-amostra" width="300" height="220" class="max-w-full max-h-full object-contain"></canvas>
+          </div>
+        </div>
+
+        <!-- 3. Granulado do Dano (Subtração / Canny) -->
+        <div class="bg-scada-card rounded-lg p-3 border border-scada-border flex flex-col">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-semibold text-slate-300 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-slate-400"></span> 3. Granulado de Dano
+            </span>
+            <button onclick="baixarCanvas('canvas-dano', 'granulado_dano.png')" class="text-[11px] text-sky-400 hover:underline flex items-center gap-1 font-mono">
+              <i class="fa-solid fa-download"></i> Baixar
+            </button>
+          </div>
+          <div class="canvas-viewport rounded-lg overflow-hidden flex-1 flex items-center justify-center min-h-[220px]">
+            <canvas id="canvas-dano" width="300" height="220" class="max-w-full max-h-full object-contain"></canvas>
+          </div>
+        </div>
+
+        <!-- 4. Diagnóstico Final com Overlay Vermelho -->
+        <div class="bg-scada-card rounded-lg p-3 border border-scada-border flex flex-col">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-semibold text-slate-300 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-rose-500"></span> 4. Overlay de Reprovação
+            </span>
+            <button onclick="baixarCanvas('canvas-overlay', 'laudo_visual.png')" class="text-[11px] text-sky-400 hover:underline flex items-center gap-1 font-mono">
+              <i class="fa-solid fa-download"></i> Baixar
+            </button>
+          </div>
+          <div class="canvas-viewport rounded-lg overflow-hidden flex-1 flex items-center justify-center min-h-[220px] relative">
+            <canvas id="canvas-overlay" width="300" height="220" class="max-w-full max-h-full object-contain"></canvas>
+            <div id="badge-status-visao" class="absolute top-2 left-2 right-2 p-1.5 rounded bg-scada-bg/90 border border-scada-border text-left text-xs font-mono shadow backdrop-blur-sm">
+              <div id="visao-status-texto" class="font-bold text-emerald-400 text-xs">STATUS: APROVADO</div>
+              <div id="visao-detalhe-texto" class="text-[10px] text-slate-300">Todas as 3 ROIs dentro do envelope seguro.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TABELA DE LAUDO DAS 3 ROIs -->
+      <div class="overflow-x-auto rounded-lg border border-scada-border bg-scada-bg/70 p-3">
+        <table class="w-full text-left text-xs font-mono">
+          <thead>
+            <tr class="text-slate-400 border-b border-scada-border">
+              <th class="pb-2">Região Mecânica (ROI)</th>
+              <th class="pb-2">Localização no Gabarito</th>
+              <th class="pb-2">Modo de Falha Associado</th>
+              <th class="pb-2">Dano Detectado (%)</th>
+              <th class="pb-2">Tolerância Limite</th>
+              <th class="pb-2 text-right">Laudo Visual</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-scada-border text-slate-200">
+            <tr>
+              <td class="py-2.5 font-bold text-amber-400 flex items-center gap-2">
+                <span class="w-2 h-2 rounded bg-amber-400 inline-block"></span> ROI 1: Rolamentos / Mancal
+              </td>
+              <td class="py-2.5 text-slate-400">Extremidade Esquerda (X: 10 a 95px)</td>
+              <td class="py-2.5 text-slate-300">Classe 1: Desgaste de Rolamento</td>
+              <td id="roi1-dano" class="py-2.5 font-bold text-emerald-400">0.00%</td>
+              <td id="roi1-limite" class="py-2.5 text-slate-400">2.5%</td>
+              <td class="py-2.5 text-right"><span id="roi1-status" class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold">APROVADO</span></td>
+            </tr>
+            <tr>
+              <td class="py-2.5 font-bold text-sky-400 flex items-center gap-2">
+                <span class="w-2 h-2 rounded bg-sky-400 inline-block"></span> ROI 2: Rotor / Eixo Central
+              </td>
+              <td class="py-2.5 text-slate-400">Setor Central (X: 95 a 205px)</td>
+              <td class="py-2.5 text-slate-300">Classe 2: Desbalanceamento de Rotor</td>
+              <td id="roi2-dano" class="py-2.5 font-bold text-emerald-400">0.00%</td>
+              <td id="roi2-limite" class="py-2.5 text-slate-400">2.5%</td>
+              <td class="py-2.5 text-right"><span id="roi2-status" class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold">APROVADO</span></td>
+            </tr>
+            <tr>
+              <td class="py-2.5 font-bold text-rose-400 flex items-center gap-2">
+                <span class="w-2 h-2 rounded bg-rose-400 inline-block"></span> ROI 3: Pás da Turbina / Impulsor
+              </td>
+              <td class="py-2.5 text-slate-400">Voluta Direita (X: 205 a 290px)</td>
+              <td class="py-2.5 text-slate-300">Classe 3: Cavitação / Superaquecimento</td>
+              <td id="roi3-dano" class="py-2.5 font-bold text-emerald-400">0.00%</td>
+              <td id="roi3-limite" class="py-2.5 text-slate-400">2.5%</td>
+              <td class="py-2.5 text-right"><span id="roi3-status" class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold">APROVADO</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SEÇÃO 2: TELEMETRIA DE SENSORES IOT -->
+    <section class="bg-scada-panel border border-scada-border rounded-xl p-5 shadow-2xl">
+      <div class="flex flex-col lg:flex-row justify-between lg:items-center pb-4 mb-4 border-b border-scada-border gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2 font-mono">
+            <i class="fa-solid fa-microchip text-emerald-400"></i>
+            2. Telemetria de Sensores IoT & Fusão Multimodal
+          </h2>
+          <p class="text-xs text-slate-400">Parâmetros físicos contínuos coletados da bancada em tempo real para inferência preditiva.</p>
+        </div>
+
+        <div class="flex items-center gap-2 text-xs font-mono">
+          <span class="text-slate-400">Endpoint REST:</span>
+          <input type="text" id="api-endpoint" value="http://127.0.0.1:8000/predict" class="bg-scada-bg border border-scada-border rounded px-2.5 py-1 text-sky-400 w-64 focus:outline-none focus:border-sky-500">
+        </div>
+      </div>
+
+      <!-- GRID DE SENSORES EDITÁVEIS -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 mb-5">
+        <!-- 1. Temperatura -->
+        <div class="bg-scada-card p-3 rounded-lg border border-scada-border">
+          <div class="flex items-center justify-between text-xs text-amber-400 font-semibold mb-1">
+            <span><i class="fa-solid fa-temperature-half mr-1"></i> Temperatura</span>
+            <span class="text-[10px] text-slate-400">°C</span>
+          </div>
+          <input type="number" id="sensor-temp" step="0.5" value="63.5" class="w-full bg-scada-bg border border-scada-border rounded px-2 py-1.5 text-sm font-mono text-white focus:border-amber-400 focus:outline-none">
+          <span class="text-[10px] text-slate-500 block mt-1">Normal: 45°C a 80°C</span>
+        </div>
+
+        <!-- 2. Vibração RMS -->
+        <div class="bg-scada-card p-3 rounded-lg border border-scada-border">
+          <div class="flex items-center justify-between text-xs text-sky-400 font-semibold mb-1">
+            <span><i class="fa-solid fa-wave-square mr-1"></i> Vibração RMS</span>
+            <span class="text-[10px] text-slate-400">mm/s</span>
+          </div>
+          <input type="number" id="sensor-vib" step="0.1" value="2.8" class="w-full bg-scada-bg border border-scada-border rounded px-2 py-1.5 text-sm font-mono text-white focus:border-sky-400 focus:outline-none">
+          <span class="text-[10px] text-slate-500 block mt-1">Normal: 1.0 a 4.5 mm/s</span>
+        </div>
+
+        <!-- 3. Pressão de Óleo -->
+        <div class="bg-scada-card p-3 rounded-lg border border-scada-border">
+          <div class="flex items-center justify-between text-xs text-rose-400 font-semibold mb-1">
+            <span><i class="fa-solid fa-gauge mr-1"></i> Pressão Óleo</span>
+            <span class="text-[10px] text-slate-400">bar</span>
+          </div>
+          <input type="number" id="sensor-pressao" step="0.1" value="4.2" class="w-full bg-scada-bg border border-scada-border rounded px-2 py-1.5 text-sm font-mono text-white focus:border-rose-400 focus:outline-none">
+          <span class="text-[10px] text-slate-500 block mt-1">Normal: 3.5 a 5.0 bar</span>
+        </div>
+
+        <!-- 4. Rotação (RPM) -->
+        <div class="bg-scada-card p-3 rounded-lg border border-scada-border">
+          <div class="flex items-center justify-between text-xs text-blue-400 font-semibold mb-1">
+            <span><i class="fa-solid fa-rotate mr-1"></i> Rotação</span>
+            <span class="text-[10px] text-slate-400">RPM</span>
+          </div>
+          <input type="number" id="sensor-rpm" step="10" value="3000" class="w-full bg-scada-bg border border-scada-border rounded px-2 py-1.5 text-sm font-mono text-white focus:border-blue-400 focus:outline-none">
+          <span class="text-[10px] text-slate-500 block mt-1">Nominal: 3000 RPM</span>
+        </div>
+
+        <!-- 5. Emissão Acústica -->
+        <div class="bg-scada-card p-3 rounded-lg border border-scada-border">
+          <div class="flex items-center justify-between text-xs text-purple-400 font-semibold mb-1">
+            <span><i class="fa-solid fa-volume-high mr-1"></i> Acústica</span>
+            <span class="text-[10px] text-slate-400">dB</span>
+          </div>
+          <input type="number" id="sensor-acustica" step="0.5" value="53.0" class="w-full bg-scada-bg border border-scada-border rounded px-2 py-1.5 text-sm font-mono text-white focus:border-purple-400 focus:outline-none">
+          <span class="text-[10px] text-slate-500 block mt-1">Normal: 40 a 65 dB</span>
+        </div>
+
+        <!-- 6. Corrente Elétrica -->
+        <div class="bg-scada-card p-3 rounded-lg border border-scada-border">
+          <div class="flex items-center justify-between text-xs text-emerald-400 font-semibold mb-1">
+            <span><i class="fa-solid fa-bolt mr-1"></i> Corrente</span>
+            <span class="text-[10px] text-slate-400">A</span>
+          </div>
+          <input type="number" id="sensor-corrente" step="0.5" value="28.5" class="w-full bg-scada-bg border border-scada-border rounded px-2 py-1.5 text-sm font-mono text-white focus:border-emerald-400 focus:outline-none">
+          <span class="text-[10px] text-slate-500 block mt-1">Normal: 20 a 35 A</span>
+        </div>
+      </div>
+
+      <!-- BOTÃO DE DISPARO DA AUDITORIA -->
+      <div class="flex flex-col sm:flex-row justify-between items-center gap-4 bg-scada-bg/90 p-4 rounded-lg border border-scada-border">
+        <div class="flex items-center gap-3">
+          <div class="p-2.5 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 text-lg">
+            <i class="fa-solid fa-calculator"></i>
+          </div>
+          <div>
+            <div class="text-xs text-slate-400 font-mono">Severidade Dinâmica Derivada (Vibração RMS / RPM):</div>
+            <div id="valor-severidade-dinamica" class="text-sm font-mono font-bold text-sky-300">0.000933 mm/s/RPM</div>
+          </div>
+        </div>
+
+        <button onclick="executarAuditoriaCompleta()" class="w-full sm:w-auto px-6 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition shadow-lg flex items-center justify-center gap-2 active:scale-95 font-mono uppercase tracking-wider">
+          <i class="fa-solid fa-shield-virus"></i> Executar Auditoria Técnica Completa
+        </button>
+      </div>
+    </section>
+
+    <!-- SEÇÃO 3: RESULTADOS E DIAGNÓSTICO FINAL (3 COLUNAS) -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- COLUNA 1: DIAGNÓSTICO INTEGRADO -->
+      <section class="bg-scada-panel border border-scada-border rounded-xl p-5 shadow-2xl flex flex-col justify-between">
+        <div>
+          <div class="flex justify-between items-center pb-3 mb-4 border-b border-scada-border">
+            <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-2">
+              <i class="fa-solid fa-heart-pulse text-rose-500"></i> Laudo Multimodal
+            </h3>
+            <span id="badge-clp-status" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950 text-emerald-400 border border-emerald-700">OK - NOMINAL</span>
+          </div>
+
+          <!-- Score Global de Risco -->
+          <div class="mb-4 text-center p-4 rounded-lg bg-scada-bg border border-scada-border">
+            <div class="text-xs text-slate-400 uppercase tracking-wider font-mono mb-1">Risco Composto de Falha</div>
+            <div id="display-probabilidade" class="text-4xl font-mono font-extrabold text-emerald-400">2.1%</div>
+            <div id="display-detalhe-ponderado" class="text-[11px] text-slate-400 mt-1 font-mono">Ponderação: Sensores Nominais + 3 ROIs Saudáveis</div>
+          </div>
+
+          <!-- Modo de Falha Predominante -->
+          <div class="space-y-2 mb-4">
+            <div class="text-xs text-slate-400 font-mono">Classe de Operação Diagnosticada:</div>
+            <div id="display-diagnostico-titulo" class="p-3 rounded-lg bg-scada-card border border-emerald-500/30 text-emerald-400 font-bold text-sm flex items-center justify-between font-mono">
+              <span>0: Operação Normal</span>
+              <i class="fa-solid fa-check-circle"></i>
+            </div>
+          </div>
+
+          <!-- Ação Técnica Recomendada -->
+          <div class="p-3 rounded-lg bg-scada-card/60 border border-scada-border text-xs text-slate-300">
+            <span class="font-semibold text-slate-200 block mb-1 font-mono uppercase text-[11px]">Parecer de Engenharia:</span>
+            <p id="display-recomendacao" class="text-slate-400 leading-relaxed font-sans">
+              Bancada em conformidade plena. Nenhuma anomalia superficial identificada no conjunto motor/bomba e assinaturas dinâmicas estáveis.
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-scada-border text-[11px] text-slate-500 flex items-center justify-between font-mono">
+          <span>Latência: <strong id="valor-latencia" class="text-slate-300">12ms</strong></span>
+          <span>Origem: <strong id="valor-origem-inferencia" class="text-slate-300">Motor Local SCADA</strong></span>
+        </div>
+      </section>
+
+      <!-- COLUNA 2: GRÁFICO DE BARRAS DAS 4 CLASSES -->
+      <section class="bg-scada-panel border border-scada-border rounded-xl p-5 shadow-2xl flex flex-col">
+        <div class="flex justify-between items-center pb-3 mb-2 border-b border-scada-border">
+          <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-2">
+            <i class="fa-solid fa-chart-column text-sky-400"></i> Probabilidade por Estado
+          </h3>
+          <span class="text-[11px] font-mono text-slate-400">4 Modos de Falha</span>
+        </div>
+        <div class="flex-1 min-h-[220px] relative">
+          <canvas id="grafico-probabilidades"></canvas>
+        </div>
+      </section>
+
+      <!-- COLUNA 3: LOG JSON DA API / CLP -->
+      <section class="bg-scada-panel border border-scada-border rounded-xl p-5 shadow-2xl flex flex-col">
+        <div class="flex justify-between items-center pb-3 mb-2 border-b border-scada-border">
+          <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-2">
+            <i class="fa-solid fa-terminal text-amber-400"></i> Payload JSON (Telemetria & Inferência)
+          </h3>
+          <button onclick="copiarJsonTerminal()" class="text-xs text-sky-400 hover:underline font-mono">
+            <i class="fa-regular fa-copy"></i> Copiar
+          </button>
+        </div>
+        
+        <div class="flex-1 bg-scada-bg p-3 rounded-lg border border-scada-border font-mono text-xs text-slate-300 overflow-y-auto max-h-[240px] scada-scrollbar">
+          <pre id="terminal-json" class="whitespace-pre-wrap leading-relaxed text-[11px] text-emerald-400">// Pronto para auditoria técnica...</pre>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- JAVASCRIPT: LÓGICA COMPLETA DE DESENHO, PROCESSAMENTO ÓPTICO E FUSÃO PREDITIVA -->
+  <script>
+    // ESTADO DAS 3 ROIs (X inicial, X final em pixels no canvas de 300x220)
+    const ROIS = {
+      rolamento: { x1: 15, x2: 95, nome: "Rolamento / Mancal", falha: 1, dano: 0.0 },
+      rotor:     { x1: 95, x2: 205, nome: "Rotor / Eixo", falha: 2, dano: 0.0 },
+      pas:       { x1: 205, x2: 285, nome: "Pás da Turbina", falha: 3, dano: 0.0 }
+    };
+
+    let chartProbabilidades = null;
+
+    // INICIALIZAÇÃO
+    window.onload = function() {
+      inicializarGrafico();
+      carregarPreset('normal');
+      atualizarSeveridadeDinamica();
+
+      // Sliders
+      document.getElementById('slider-sensibilidade').addEventListener('input', function(e) {
+        document.getElementById('valor-sensibilidade').innerText = e.target.value;
+        processarInspecaoVisual();
+      });
+
+      document.getElementById('slider-tolerancia').addEventListener('input', function(e) {
+        document.getElementById('valor-tolerancia').innerText = e.target.value + '%';
+        document.getElementById('roi1-limite').innerText = e.target.value + '%';
+        document.getElementById('roi2-limite').innerText = e.target.value + '%';
+        document.getElementById('roi3-limite').innerText = e.target.value + '%';
+        processarInspecaoVisual();
+      });
+
+      // Inputs de imagem customizada
+      document.getElementById('input-gabarito').addEventListener('change', function(e) {
+        carregarImagemArquivo(e.target.files[0], 'canvas-gabarito');
+      });
+      document.getElementById('input-amostra').addEventListener('change', function(e) {
+        carregarImagemArquivo(e.target.files[0], 'canvas-amostra');
+      });
+
+      // Atualiza severidade em tempo real
+      document.getElementById('sensor-vib').addEventListener('input', atualizarSeveridadeDinamica);
+      document.getElementById('sensor-rpm').addEventListener('input', atualizarSeveridadeDinamica);
+    };
+
+    function atualizarSeveridadeDinamica() {
+      const vib = parseFloat(document.getElementById('sensor-vib').value) || 0;
+      const rpm = parseFloat(document.getElementById('sensor-rpm').value) || 1;
+      const sev = vib / rpm;
+      document.getElementById('valor-severidade-dinamica').innerText = sev.toFixed(6) + ' mm/s/RPM';
+    }
+
+    // DESENHAR CORTE LONGITUDINAL DO MOTOR/BOMBA (COM OU SEM FALHAS INJETADAS)
+    function desenharMotorEsquematico(canvasId, falhaTipo = null) {
+      const cv = document.getElementById(canvasId);
+      const ctx = cv.getContext('2d');
+      const w = cv.width;
+      const h = cv.height;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Fundo escuro industrial
+      ctx.fillStyle = '#0a101f';
+      ctx.fillRect(0, 0, w, h);
+
+      // Carcaça externa da bancada
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(10, 45, 280, 130);
+
+      // EIXO CENTRAL DE TRANSMISSÃO
+      ctx.fillStyle = '#64748b';
+      ctx.fillRect(5, 102, 290, 16);
+      ctx.strokeStyle = '#94a3b8';
+      ctx.strokeRect(5, 102, 290, 16);
+
+      // ========================================================
+      // 1. ZONA DO ROLAMENTO / MANCAL (ROI 1: X=15 a 95)
+      // ========================================================
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(25, 65, 60, 90);
+      ctx.strokeStyle = '#475569';
+      ctx.strokeRect(25, 65, 60, 90);
+
+      // Esferas do rolamento
+      const esferasY = [78, 100, 122, 142];
+      esferasY.forEach(y => {
+        ctx.beginPath();
+        ctx.arc(55, y, 7, 0, Math.PI * 2);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fill();
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.stroke();
+      });
+
+      // Se houver falha no rolamento, desenha microfissuras e atrito
+      if (falhaTipo === 'rolamento') {
+        ctx.strokeStyle = '#f8fafc';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(35, 75); ctx.lineTo(65, 88);
+        ctx.moveTo(50, 115); ctx.lineTo(75, 135);
+        ctx.moveTo(30, 130); ctx.lineTo(55, 145);
+        ctx.stroke();
+
+        ctx.fillStyle = '#f1f5f9';
+        for (let i = 0; i < 20; i++) {
+          ctx.fillRect(30 + Math.random() * 45, 70 + Math.random() * 75, 2, 2);
+        }
+      }
+
+      // ========================================================
+      // 2. ZONA DO ROTOR E NÚCLEO MAGNÉTICO (ROI 2: X=95 a 205)
+      // ========================================================
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(105, 58, 90, 104);
+      ctx.strokeStyle = '#475569';
+      ctx.strokeRect(105, 58, 90, 104);
+
+      // Ranhuras magnéticas do rotor
+      for (let rx = 115; rx <= 185; rx += 14) {
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(rx, 62, 8, 96);
+      }
+
+      // Bobinagem de cobre nas extremidades
+      ctx.fillStyle = '#b45309';
+      ctx.fillRect(100, 70, 6, 80);
+      ctx.fillRect(194, 70, 6, 80);
+
+      // Se houver falha no rotor (desbalanceamento / raspagem)
+      if (falhaTipo === 'rotor') {
+        ctx.strokeStyle = '#f8fafc';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        // Ranhura profunda excêntrica
+        ctx.moveTo(110, 80); ctx.lineTo(185, 95);
+        ctx.moveTo(115, 125); ctx.lineTo(180, 140);
+        ctx.stroke();
+
+        ctx.fillStyle = '#f1f5f9';
+        for (let j = 0; j < 30; j++) {
+          ctx.fillRect(110 + Math.random() * 75, 65 + Math.random() * 85, 2.5, 2.5);
+        }
+      }
+
+      // ========================================================
+      // 3. ZONA DAS PÁS DO IMPULSOR / VOLUTA (ROI 3: X=205 a 285)
+      // ========================================================
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.arc(245, 110, 42, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#475569';
+      ctx.stroke();
+
+      // Desenho das pás curvas da turbina
+      for (let a = 0; a < 6; a++) {
+        let ang = (a * Math.PI) / 3;
+        ctx.beginPath();
+        ctx.arc(245 + Math.cos(ang) * 22, 110 + Math.sin(ang) * 22, 16, ang, ang + 1.2);
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+
+      // Se houver cavitação nas pás (erosão e pitting)
+      if (falhaTipo === 'pas') {
+        ctx.strokeStyle = '#f8fafc';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        // Aresta quebrada da pá
+        ctx.moveTo(230, 95); ctx.lineTo(260, 85);
+        ctx.moveTo(235, 125); ctx.lineTo(265, 135);
+        ctx.stroke();
+
+        // Erosão por microbolhas de cavitação
+        ctx.fillStyle = '#f1f5f9';
+        for (let k = 0; k < 45; k++) {
+          ctx.fillRect(220 + Math.random() * 50, 80 + Math.random() * 60, 2, 2);
+        }
+      }
+
+      // Se for o canvas da peça em teste, desenha as Bounding Boxes identificadoras
+      if (canvasId === 'canvas-amostra' || canvasId === 'canvas-gabarito') {
+        ctx.lineWidth = 1;
+        // ROI 1: Rolamento
+        ctx.strokeStyle = '#f59e0b';
+        ctx.strokeRect(15, 50, 80, 120);
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = '9px Consolas, monospace';
+        ctx.fillText('ROI 1: ROLAMENTO', 17, 44);
+
+        // ROI 2: Rotor
+        ctx.strokeStyle = '#38bdf8';
+        ctx.strokeRect(95, 50, 110, 120);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillText('ROI 2: ROTOR', 120, 44);
+
+        // ROI 3: Pás
+        ctx.strokeStyle = '#f43f5e';
+        ctx.strokeRect(205, 50, 80, 120);
+        ctx.fillStyle = '#f43f5e';
+        ctx.fillText('ROI 3: PÁS', 225, 44);
+      }
+    }
+
+    // CARREGAR PRESETS INDUSTRIAIS
+    function carregarPreset(tipo) {
+      // Sempre desenha gabarito perfeito
+      desenharMotorEsquematico('canvas-gabarito', null);
+
+      if (tipo === 'normal') {
+        desenharMotorEsquematico('canvas-amostra', null);
+        document.getElementById('sensor-temp').value = '63.0';
+        document.getElementById('sensor-vib').value = '2.4';
+        document.getElementById('sensor-pressao').value = '4.3';
+        document.getElementById('sensor-rpm').value = '3000';
+        document.getElementById('sensor-acustica').value = '52.0';
+        document.getElementById('sensor-corrente').value = '28.0';
+      } else if (tipo === 'rolamento') {
+        desenharMotorEsquematico('canvas-amostra', 'rolamento');
+        document.getElementById('sensor-temp').value = '71.5';
+        document.getElementById('sensor-vib').value = '9.8';
+        document.getElementById('sensor-pressao').value = '4.1';
+        document.getElementById('sensor-rpm').value = '3010';
+        document.getElementById('sensor-acustica').value = '82.5'; // Ruído ultrassônico característico
+        document.getElementById('sensor-corrente').value = '31.0';
+      } else if (tipo === 'rotor') {
+        desenharMotorEsquematico('canvas-amostra', 'rotor');
+        document.getElementById('sensor-temp').value = '68.0';
+        document.getElementById('sensor-vib').value = '11.5';     // Vibração severa por excentricidade
+        document.getElementById('sensor-pressao').value = '4.2';
+        document.getElementById('sensor-rpm').value = '3050';
+        document.getElementById('sensor-acustica').value = '56.0';
+        document.getElementById('sensor-corrente').value = '47.5'; // Sobrecarga elétrica no motor
+      } else if (tipo === 'pas') {
+        desenharMotorEsquematico('canvas-amostra', 'pas');
+        document.getElementById('sensor-temp').value = '99.5';     // Salto térmico crítico
+        document.getElementById('sensor-vib').value = '3.5';
+        document.getElementById('sensor-pressao').value = '1.8';   // Perda severa de pressão lubrificante
+        document.getElementById('sensor-rpm').value = '3020';
+        document.getElementById('sensor-acustica').value = '55.0';
+        document.getElementById('sensor-corrente').value = '29.5';
+      }
+
+      atualizarSeveridadeDinamica();
+      processarInspecaoVisual();
+      executarAuditoriaCompleta();
+    }
+
+    // PROCESSAR ARQUIVO EXTERNO ENVIADO PELO USUÁRIO
+    function carregarImagemArquivo(file, canvasId) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const cv = document.getElementById(canvasId);
+          const ctx = cv.getContext('2d');
+          ctx.clearRect(0, 0, cv.width, cv.height);
+          ctx.drawImage(img, 0, 0, cv.width, cv.height);
+          processarInspecaoVisual();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // PROCESSAMENTO DE SUBTRAÇÃO E CÁLCULO DE DANO POR ROI
+    function processarInspecaoVisual() {
+      const cG = document.getElementById('canvas-gabarito');
+      const cA = document.getElementById('canvas-amostra');
+      const cD = document.getElementById('canvas-dano');
+      const cO = document.getElementById('canvas-overlay');
+
+      const ctxG = cG.getContext('2d');
+      const ctxA = cA.getContext('2d');
+      const ctxD = cD.getContext('2d');
+      const ctxO = cO.getContext('2d');
+
+      const w = cG.width;
+      const h = cG.height;
+
+      const imgG = ctxG.getImageData(0, 0, w, h);
+      const imgA = ctxA.getImageData(0, 0, w, h);
+      const imgD = ctxD.createImageData(w, h);
+      const imgO = ctxA.getImageData(0, 0, w, h);
+
+      const sensibilidade = parseInt(document.getElementById('slider-sensibilidade').value);
+      const tolerancia = parseFloat(document.getElementById('slider-tolerancia').value);
+
+      let pixelsDanoROI = { rolamento: 0, rotor: 0, pas: 0 };
+      let pixelsTotalROI = { rolamento: 0, rotor: 0, pas: 0 };
+
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const idx = (y * w + x) * 4;
+          const diff = (
+            Math.abs(imgG.data[idx] - imgA.data[idx]) +
+            Math.abs(imgG.data[idx+1] - imgA.data[idx+1]) +
+            Math.abs(imgG.data[idx+2] - imgA.data[idx+2])
+          ) / 3;
+
+          // Identifica a qual ROI o pixel pertence
+          let roiChave = null;
+          if (x >= ROIS.rolamento.x1 && x < ROIS.rolamento.x2 && y >= 50 && y <= 170) roiChave = 'rolamento';
+          else if (x >= ROIS.rotor.x1 && x < ROIS.rotor.x2 && y >= 50 && y <= 170) roiChave = 'rotor';
+          else if (x >= ROIS.pas.x1 && x < ROIS.pas.x2 && y >= 50 && y <= 170) roiChave = 'pas';
+
+          if (roiChave) {
+            pixelsTotalROI[roiChave]++;
+          }
+
+          if (diff > sensibilidade) {
+            if (roiChave) pixelsDanoROI[roiChave]++;
+
+            // Painel 3: Granulado Branco sobre Fundo Escuro
+            imgD.data[idx] = 255;
+            imgD.data[idx+1] = 255;
+            imgD.data[idx+2] = 255;
+            imgD.data[idx+3] = 255;
+
+            // Painel 4: Overlay em Vermelho Brilhante
+            imgO.data[idx] = 244;
+            imgO.data[idx+1] = 63;
+            imgO.data[idx+2] = 94;
+            imgO.data[idx+3] = 255;
+          } else {
+            imgD.data[idx] = 10;
+            imgD.data[idx+1] = 16;
+            imgD.data[idx+2] = 31;
+            imgD.data[idx+3] = 255;
+          }
+        }
+      }
+
+      ctxD.putImageData(imgD, 0, 0);
+      ctxO.putImageData(imgO, 0, 0);
+
+      // Atualiza percentuais por ROI
+      ROIS.rolamento.dano = (pixelsDanoROI.rolamento / Math.max(1, pixelsTotalROI.rolamento)) * 100;
+      ROIS.rotor.dano     = (pixelsDanoROI.rotor / Math.max(1, pixelsTotalROI.rotor)) * 100;
+      ROIS.pas.dano       = (pixelsDanoROI.pas / Math.max(1, pixelsTotalROI.pas)) * 100;
+
+      atualizarTabelaLaudo(tolerancia);
+    }
+
+    // ATUALIZAR TABELA DE LAUDO DAS 3 ROIs
+    function atualizarTabelaLaudo(tolerancia) {
+      const r1 = document.getElementById('roi1-dano');
+      const r2 = document.getElementById('roi2-dano');
+      const r3 = document.getElementById('roi3-dano');
+
+      const s1 = document.getElementById('roi1-status');
+      const s2 = document.getElementById('roi2-status');
+      const s3 = document.getElementById('roi3-status');
+
+      r1.innerText = ROIS.rolamento.dano.toFixed(2) + '%';
+      r2.innerText = ROIS.rotor.dano.toFixed(2) + '%';
+      r3.innerText = ROIS.pas.dano.toFixed(2) + '%';
+
+      function setBadge(elem, val) {
+        if (val > tolerancia) {
+          elem.innerText = 'REPROVADO';
+          elem.className = 'px-2 py-0.5 rounded bg-rose-950 text-rose-400 border border-rose-800 font-bold';
+        } else {
+          elem.innerText = 'APROVADO';
+          elem.className = 'px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold';
+        }
+      }
+
+      setBadge(s1, ROIS.rolamento.dano);
+      setBadge(s2, ROIS.rotor.dano);
+      setBadge(s3, ROIS.pas.dano);
+
+      const algumReprovado = (ROIS.rolamento.dano > tolerancia || ROIS.rotor.dano > tolerancia || ROIS.pas.dano > tolerancia);
+      const bVisao = document.getElementById('badge-status-visao');
+      const txtStatus = document.getElementById('visao-status-texto');
+      const txtDet = document.getElementById('visao-detalhe-texto');
+
+      if (algumReprovado) {
+        txtStatus.innerText = 'STATUS: REPROVADO';
+        txtStatus.className = 'font-bold text-rose-500 text-xs font-mono';
+        txtDet.innerText = 'Dano estrutural óptico detectado acima da tolerância permitida.';
+      } else {
+        txtStatus.innerText = 'STATUS: APROVADO';
+        txtStatus.className = 'font-bold text-emerald-400 text-xs font-mono';
+        txtDet.innerText = 'Todas as 3 ROIs mecânicas em conformidade com o gabarito.';
+      }
+    }
+
+    // BAIXAR CANVAS EM PNG
+    function baixarCanvas(id, nome) {
+      const cv = document.getElementById(id);
+      const a = document.createElement('a');
+      a.download = nome;
+      a.href = cv.toDataURL();
+      a.click();
+    }
+
+    // INICIALIZAR GRÁFICO DE PROBABILIDADES DAS 4 CLASSES
+    function inicializarGrafico() {
+      const ctx = document.getElementById('grafico-probabilidades').getContext('2d');
+      chartProbabilidades = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: [
+            '0: Normal',
+            '1: Rolamento',
+            '2: Rotor',
+            '3: Cavitação'
+          ],
+          datasets: [{
+            label: 'Probabilidade (%)',
+            data: [98.2, 0.8, 0.6, 0.4],
+            backgroundColor: [
+              'rgba(16, 185, 129, 0.8)',
+              'rgba(245, 158, 11, 0.8)',
+              'rgba(56, 189, 248, 0.8)',
+              'rgba(244, 63, 94, 0.8)'
+            ],
+            borderColor: [
+              '#10b981',
+              '#f59e0b',
+              '#38bdf8',
+              '#f43f5e'
+            ],
+            borderWidth: 1.5,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 100,
+              grid: { color: '#1f2e4d' },
+              ticks: { color: '#94a3b8', font: { family: 'Consolas, monospace' } }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#cbd5e1', font: { weight: '600', family: 'Consolas, monospace' } }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(c) { return c.raw.toFixed(2) + '%'; }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // DISPARO DA AUDITORIA COMPLETA (FUSÃO VISÃO + TELEMETRIA IOT + API)
+    async function executarAuditoriaCompleta() {
+      const t0 = performance.now();
+      const endpoint = document.getElementById('api-endpoint').value;
+
+      const temp = parseFloat(document.getElementById('sensor-temp').value);
+      const vib = parseFloat(document.getElementById('sensor-vib').value);
+      const pressao = parseFloat(document.getElementById('sensor-pressao').value);
+      const rpm = parseFloat(document.getElementById('sensor-rpm').value);
+      const acustica = parseFloat(document.getElementById('sensor-acustica').value);
+      const corrente = parseFloat(document.getElementById('sensor-corrente').value);
+      const severidade = vib / rpm;
+
+      // Payload compatível com a API FastAPI da AeroMotion Dynamics
+      const payload = {
+        horas_operacao_acumuladas: 2450.0,
+        temperatura_mancal_c: temp,
+        vibracao_rms_mms: vib,
+        pressao_oleo_bar: pressao,
+        rotacao_rpm: rpm,
+        emissao_acustica_db: acustica,
+        corrente_eletrica_amp: corrente,
+        temp_rolling_mean_1h: temp - 0.4,
+        temp_rolling_std_1h: 1.1,
+        temp_rolling_mean_6h: temp - 0.9,
+        temp_rolling_std_6h: 2.0,
+        vib_rolling_mean_1h: vib - 0.2,
+        vib_rolling_std_1h: 0.3,
+        vib_rolling_mean_6h: vib - 0.3,
+        vib_rolling_std_6h: 0.5,
+        severidade_dinamica: severidade
+      };
+
+      let resposta = null;
+      let origem = 'FastAPI Local (Porta 8000)';
+
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error('Status ' + res.status);
+        resposta = await res.json();
+      } catch (e) {
+        origem = 'Motor Local SCADA (Modo Offline Air-Gapped)';
+        resposta = simularRandomForestOffline(payload);
+      }
+
+      const t1 = performance.now();
+      document.getElementById('valor-latencia').innerText = Math.round(t1 - t0) + 'ms';
+      document.getElementById('valor-origem-inferencia').innerText = origem;
+
+      // FUSÃO MULTIMODAL:
+      // O dano de cada ROI da visão atua diretamente na respectiva classe de falha
+      aplicarFusaoMultimodal(resposta, payload, origem);
+    }
+
+    // MOTOR OFFLINE EQUIVALENTE AO MODELO RANDOM FOREST TREINADO
+    function simularRandomForestOffline(p) {
+      let probs = [0.95, 0.02, 0.02, 0.01];
+
+      // Regra Falsa 3: Cavitação e Térmica
+      if (p.temperatura_mancal_c > 88 || p.pressao_oleo_bar < 2.6) {
+        probs = [0.03, 0.03, 0.04, 0.90];
+      }
+      // Regra Falsa 1: Desgaste de Rolamento
+      else if (p.emissao_acustica_db > 75 || (p.vibracao_rms_mms > 7.0 && p.corrente_eletrica_amp < 36)) {
+        probs = [0.04, 0.91, 0.03, 0.02];
+      }
+      // Regra Falsa 2: Desbalanceamento de Rotor
+      else if (p.vibracao_rms_mms > 8.0 && p.corrente_eletrica_amp > 38) {
+        probs = [0.03, 0.04, 0.90, 0.03];
+      }
+
+      const maxP = Math.max(...probs);
+      const cod = probs.indexOf(maxP);
+      const titulos = ['Normal', 'Desgaste de Rolamento', 'Desbalanceamento de Rotor', 'Cavitação / Superaquecimento'];
+
+      return {
+        codigo_falha: cod,
+        diagnostico: titulos[cod],
+        probabilidades: probs
+      };
+    }
+
+    // FUSÃO MULTIMODAL MATEMÁTICA
+    function aplicarFusaoMultimodal(res, payload, origem) {
+      let probs = [...res.probabilidades];
+      const tolerancia = parseFloat(document.getElementById('slider-tolerancia').value);
+
+      // Ponderadores da Visão por ROI
+      const pesoRolamento = Math.min(ROIS.rolamento.dano / 10.0, 0.8);
+      const pesoRotor     = Math.min(ROIS.rotor.dano / 10.0, 0.8);
+      const pesoPas       = Math.min(ROIS.pas.dano / 10.0, 0.8);
+
+      if (ROIS.rolamento.dano > tolerancia) {
+        probs[1] += pesoRolamento;
+        probs[0] = Math.max(0.01, probs[0] - pesoRolamento);
+      }
+      if (ROIS.rotor.dano > tolerancia) {
+        probs[2] += pesoRotor;
+        probs[0] = Math.max(0.01, probs[0] - pesoRotor);
+      }
+      if (ROIS.pas.dano > tolerancia) {
+        probs[3] += pesoPas;
+        probs[0] = Math.max(0.01, probs[0] - pesoPas);
+      }
+
+      // Normalização da soma para 100%
+      const soma = probs.reduce((a, b) => a + b, 0);
+      probs = probs.map(p => (p / soma) * 100);
+
+      // Atualiza Chart.js
+      chartProbabilidades.data.datasets[0].data = probs;
+      chartProbabilidades.update();
+
+      // Classe Campeã Pós-Fusão
+      const maxProb = Math.max(...probs);
+      const classeFinal = probs.indexOf(maxProb);
+
+      const dProb = document.getElementById('display-probabilidade');
+      const dDiag = document.getElementById('display-diagnostico-titulo');
+      const dRec = document.getElementById('display-recomendacao');
+      const bClp = document.getElementById('badge-clp-status');
+      const dDet = document.getElementById('display-detalhe-ponderado');
+
+      const riscoGlobal = 100 - probs[0];
+      dProb.innerText = `${riscoGlobal.toFixed(1)}%`;
+
+      if (classeFinal === 0) {
+        bClp.innerText = 'OK - NOMINAL';
+        bClp.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950 text-emerald-400 border border-emerald-700';
+        dProb.className = 'text-4xl font-mono font-extrabold text-emerald-400';
+        dDiag.className = 'p-3 rounded-lg bg-scada-card border border-emerald-500/30 text-emerald-400 font-bold text-sm flex items-center justify-between font-mono';
+        dDiag.innerHTML = `<span>0: Operação Normal</span><i class="fa-solid fa-circle-check"></i>`;
+        dRec.innerText = 'Bancada e geometria de pás em estado íntegro. Próxima inspeção preventiva conforme escala padrão de fábrica.';
+        dDet.innerText = 'Telemetria dentro dos limites e 3 ROIs aprovadas pelo módulo óptico.';
+      } else if (classeFinal === 1) {
+        bClp.innerText = 'ALERTA PREVENTIVO';
+        bClp.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950 text-amber-400 border border-amber-700';
+        dProb.className = 'text-4xl font-mono font-extrabold text-amber-400';
+        dDiag.className = 'p-3 rounded-lg bg-scada-card border border-amber-500/30 text-amber-400 font-bold text-sm flex items-center justify-between font-mono';
+        dDiag.innerHTML = `<span>1: Desgaste de Rolamento</span><i class="fa-solid fa-triangle-exclamation"></i>`;
+        dRec.innerText = 'Emissão acústica elevada e microfissuras na ROI 1. Agendar troca preventiva do mancal dianteiro antes do travamento do veio.';
+        dDet.innerText = `Sensórica acústica crítica confirmada por dano visual no rolamento (${ROIS.rolamento.dano.toFixed(1)}%).`;
+      } else if (classeFinal === 2) {
+        bClp.innerText = 'RISCO DINÂMICO';
+        bClp.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-950 text-sky-400 border border-sky-700';
+        dProb.className = 'text-4xl font-mono font-extrabold text-sky-400';
+        dDiag.className = 'p-3 rounded-lg bg-scada-card border border-sky-500/30 text-sky-400 font-bold text-sm flex items-center justify-between font-mono';
+        dDiag.innerHTML = `<span>2: Desbalanceamento de Rotor</span><i class="fa-solid fa-arrows-spin"></i>`;
+        dRec.innerText = 'Severidade dinâmica e corrente do estator fora da curva de trabalho. Parar bancada para balanceamento dinâmico de massa.';
+        dDet.innerText = `Alta severidade e ranhura de excentricidade identificada na ROI 2 (${ROIS.rotor.dano.toFixed(1)}%).`;
+      } else {
+        bClp.innerText = 'EMERGÊNCIA / TÉRMICA';
+        bClp.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-950 text-rose-400 border border-rose-700 animate-pulse';
+        dProb.className = 'text-4xl font-mono font-extrabold text-rose-500';
+        dDiag.className = 'p-3 rounded-lg bg-scada-card border border-rose-500/30 text-rose-500 font-bold text-sm flex items-center justify-between font-mono';
+        dDiag.innerHTML = `<span>3: Cavitação / Superaquecimento</span><i class="fa-solid fa-fire"></i>`;
+        dRec.innerText = 'Queda severa de pressão lubrificante com salto térmico crítico. Desarmar imediatamente a turbina para evitar colapso do mancal.';
+        dDet.innerText = `Queda de pressão de óleo confirmada por erosão severa nas pás da ROI 3 (${ROIS.pas.dano.toFixed(1)}%).`;
+      }
+
+      // Atualiza Log Terminal JSON
+      const logFinal = {
+        telemetria_iot: payload,
+        visao_computacional_rois: {
+          rolamento_dano_pct: parseFloat(ROIS.rolamento.dano.toFixed(2)),
+          rotor_dano_pct: parseFloat(ROIS.rotor.dano.toFixed(2)),
+          pas_dano_pct: parseFloat(ROIS.pas.dano.toFixed(2)),
+          tolerancia_max: tolerancia
+        },
+        diagnostico_multimodal: {
+          origem_inferencia: origem,
+          classe_predita: classeFinal,
+          probabilidades_percentuais: {
+            "0_Normal": parseFloat(probs[0].toFixed(2)),
+            "1_Desgaste_Rolamento": parseFloat(probs[1].toFixed(2)),
+            "2_Desbalanceamento_Rotor": parseFloat(probs[2].toFixed(2)),
+            "3_Cavitacao_Superaquecimento": parseFloat(probs[3].toFixed(2))
+          }
+        }
+      };
+
+      document.getElementById('terminal-json').innerText = JSON.stringify(logFinal, null, 2);
+    }
+
+    // COPIAR LOG JSON
+    function copiarJsonTerminal() {
+      const txt = document.getElementById('terminal-json').innerText;
+      const t = document.createElement('textarea');
+      t.value = txt;
+      document.body.appendChild(t);
+      t.select();
+      document.execCommand('copy');
+      document.body.removeChild(t);
+      const badge = document.getElementById('api-status-badge');
+      const original = badge.innerText;
+      badge.innerText = 'LOG COPIADO!';
+      setTimeout(() => { badge.innerText = original; }, 2000);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  aeromotion-api:
+    build: .
+    container_name: aeromotion_predictive_service
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - MODEL_PATH=/app/ficheiro_IA/modelo_random_forest.joblib
+    volumes:
+      - ./ficheiro_IA:/app/ficheiro_IA:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
