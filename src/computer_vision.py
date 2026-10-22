@@ -46,7 +46,7 @@ def refinar_mascara_dano(mascara_bruta: np.ndarray, min_area_cluster: int = 30, 
         mascara_bruta = cv2.cvtColor(mascara_bruta, cv2.COLOR_BGR2GRAY)
     _, mascara_binaria = cv2.threshold(mascara_bruta, 127, 255, cv2.THRESH_BINARY)
 
-    # 1. Abertura morfológica para limpar ruídos de alta frequência
+    # 1. Abertura morfológica para limpar ruídos finos
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
     mascara_morfologica = cv2.morphologyEx(mascara_binaria, cv2.MORPH_OPEN, kernel)
 
@@ -173,10 +173,7 @@ def analisar_componente_adaptativo(
     }
 
 # =====================================================================
-# 4. FUSÃO SENSORIAL E BALANCEAMENTO DINÂMICO DE PROBABILIDADES
-# =====================================================================
-# =====================================================================
-# 4. FUSÃO SENSORIAL E BALANCEAMENTO DINÂMICO DE PROBABILIDADES
+# 4. FUSÃO SENSORIAL E BALANCEAMENTO PROPORCIONAL DE PROBABILIDADES
 # =====================================================================
 def distribuir_probabilidades_multimodal(
     laudos_rois: Dict[str, Dict[str, Any]],
@@ -198,14 +195,12 @@ def distribuir_probabilidades_multimodal(
         roi.get("status") == "REPROVADO" for roi in laudos_rois.values()
     ) or (dano_maximo > tolerancia_max)
 
-    # 1. Risco Composto e probabilidade de Operação Normal
+    # 1. Risco Composto Global
     if houve_reprovacao_visual:
-        # Escala o risco composto entre 85% e 99.6% com base na severidade máxima
         fator_severidade = min(dano_maximo / (tolerancia_max * 2.5), 1.0)
         risco_composto = 85.0 + (14.6 * fator_severidade)
         prob_normal = max(0.4, round(100.0 - risco_composto, 1))
     else:
-        # Operação nominal: risco residual de 1.5% a 5.0%
         fator_nominal = dano_maximo / max(tolerancia_max, 0.1)
         risco_composto = max(1.5, min(5.0, fator_nominal * 4.0))
         prob_normal = round(100.0 - risco_composto, 1)
@@ -224,7 +219,7 @@ def distribuir_probabilidades_multimodal(
     delta = round(100.0 - (prob_normal + p_rol + p_rot + p_pas), 1)
     p_rot = round(p_rot + delta, 1)
 
-    # 4. Diagnóstico primário baseado no maior dano real
+    # 4. Diagnóstico primário baseado no maior dano medido
     ranking = [
         ("1: Desgaste de Rolamento", p_rol),
         ("2: Desbalanceamento de Rotor", p_rot),
@@ -241,7 +236,6 @@ def distribuir_probabilidades_multimodal(
             "2: Rotor": p_rot,
             "3: Cavitação": p_pas
         },
-        # Array ordenado diretamente consumível pelo gráfico do frontend:
         "probabilidades_grafico": [prob_normal, p_rol, p_rot, p_pas]
     }
 

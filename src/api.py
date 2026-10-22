@@ -1,15 +1,19 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional, Dict, Any
 import joblib
 import pandas as pd
 import numpy as np
 import os
+import json
+
+# Importação das rotinas de visão computacional
+from computer_vision import inspecionar_motor_completo
 
 # Inicialização da API
 app = FastAPI(
     title="AeroMotion Dynamics - Predictive Maintenance API",
-    description="Microsserviço RESTful para inferência de falhas mecânicas em bancadas de teste.",
+    description="Microsserviço RESTful para inferência de falhas mecânicas e inspeção visual multimodal.",
     version="1.0.0"
 )
 
@@ -22,7 +26,7 @@ CAMINHO_SCALER = os.path.join(BASE_DIR, "..", "ficheiro_IA", "scaler_robust.jobl
 try:
     modelo = joblib.load(CAMINHO_MODELO)
     scaler = joblib.load(CAMINHO_SCALER)
-except Exception as e:
+except Exception:
     modelo = None
     scaler = None
 
@@ -67,7 +71,7 @@ def health_check():
         "algoritmo": "RandomForestClassifier (Multiclasse Balanced)"
     }
 
-# 2. Endpoint POST /predict (Inferência em Tempo Real)
+# 2. Endpoint POST /predict (Inferência Tabular via RandomForest)
 @app.post("/predict", response_model=PrevisaoSaida, tags=["Inferência"])
 def predizer_uma_leitura(dados: TelemetriaEntrada):
     if modelo is None:
@@ -83,7 +87,7 @@ def predizer_uma_leitura(dados: TelemetriaEntrada):
         probabilidades=[round(p, 4) for p in prob]
     )
 
-# 3. Endpoint POST /predict-batch (Inferência em Lote)
+# 3. Endpoint POST /predict-batch (Inferência Tabular em Lote)
 @app.post("/predict-batch", response_model=List[PrevisaoSaida], tags=["Inferência"])
 def predizer_lote(dados_lote: List[TelemetriaEntrada]):
     if modelo is None:
@@ -105,3 +109,45 @@ def predizer_lote(dados_lote: List[TelemetriaEntrada]):
         ))
         
     return respostas
+
+# 4. Endpoint POST /inspecionar-multimodal (Visão Computacional + Gráfico Ponderado)
+@app.post("/inspecionar-multimodal", tags=["Inspeção Multimodal"])
+async def inspecionar_multimodal_endpoint(
+    imagem_teste: UploadFile = File(..., description="Imagem do motor sob teste"),
+    imagem_gabarito: UploadFile = File(..., description="Imagem gabarito nominal (sem defeitos)"),
+    telemetria_json: Optional[str] = Form(None, description="JSON serializado com os sensores IoT"),
+    sensibilidade_corte: int = Form(40, description="Limiar de corte Canny"),
+    tolerancia_max: float = Form(3.0, description="Tolerância máxima de dano (%) por ROI"),
+    min_area_cluster: int = Form(30, description="Área mínima em píxeis para ignorar ruído isolado")
+):
+    try:
+        buffer_teste = await imagem_teste.read()
+        buffer_gabarito = await imagem_gabarito.read()
+        
+        telemetria_dict = json.loads(telemetria_json) if telemetria_json else {}
+        
+        # Executa a inspeção e a distribuição balanceada
+        resultado = inspecionar_motor_completo(
+            caminho_teste=buffer_teste,
+            caminho_gabarito=buffer_gabarito,
+            sensibilidade=sensibilidade_corte,
+            tolerancia_max=tolerancia_max,
+            min_area_cluster=min_area_cluster,
+            telemetria_iot=telemetria_dict
+        )
+        
+        diag = resultado["diagnostico_multimodal"]
+        
+        return {
+            "status_geral": resultado["status_geral"],
+            "risco_composto_pct": diag["risco_composto_pct"],
+            "classe_diagnosticada": diag["classe_diagnosticada"],
+            # Array estritamente balanceado consumido pela série de dados do gráfico:
+            "probabilidades_grafico": diag["probabilidades_grafico"], 
+            "probabilidade_por_estado": diag["probabilidade_por_estado"],
+            "detalhamento_rois": resultado["detalhamento_por_componente"],
+            "telemetria_processada": telemetria_dict
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Falha na inspeção ótico-sensorial: {str(e)}")
