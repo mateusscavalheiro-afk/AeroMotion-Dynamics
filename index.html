@@ -89,9 +89,10 @@
         <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
         <span class="text-slate-300 font-mono">Unidade: <strong>BOMBA-TURB-102</strong></span>
       </div>
-      <div class="flex items-center gap-2 bg-scada-bg px-3 py-1.5 rounded-lg border border-scada-border text-xs">
-        <i class="fa-solid fa-network-wired text-sky-400"></i>
-        <span class="text-slate-300 font-mono" id="api-status-badge">API: 127.0.0.1:8000</span>
+      <!-- Indicador Ativo de Saúde da API na Porta 8000 -->
+      <div id="container-status-api" class="flex items-center gap-2 bg-scada-bg px-3 py-1.5 rounded-lg border border-scada-border text-xs">
+        <span id="api-ping-dot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+        <span class="text-slate-300 font-mono" id="api-status-badge">A verificar API...</span>
       </div>
       <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 text-xs font-medium transition flex items-center gap-1.5 shadow">
         <i class="fa-solid fa-file-pdf"></i> Imprimir Laudo
@@ -375,11 +376,32 @@
           </div>
         </div>
 
-        <button onclick="executarAuditoriaCompleta()" class="w-full sm:w-auto px-6 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition shadow-lg flex items-center justify-center gap-2 active:scale-95 font-mono uppercase tracking-wider">
-          <i class="fa-solid fa-shield-virus"></i> Executar Auditoria Técnica Completa
-        </button>
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <!-- Execução Real Conectada à API FastAPI/Uvicorn -->
+          <button onclick="executarAuditoriaCompleta()" class="w-full sm:w-auto px-6 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition shadow-lg flex items-center justify-center gap-2 active:scale-95 font-mono uppercase tracking-wider">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Executar Auditoria Técnica (FastAPI)
+          </button>
+          
+          <!-- Execução Opcional Forçada de Contingência Offline -->
+          <button onclick="executarContingenciaOffline()" title="Utilizar apenas em caso de manutenção da API" class="px-3 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 text-xs font-mono transition flex items-center gap-1.5 shadow" >
+            <i class="fa-solid fa-laptop-code"></i> Modo Offline
+          </button>
+        </div>
       </div>
     </section>
+
+    <!-- BANNER DE ALERTA DE CONEXÃO -->
+    <div id="banner-erro-api" class="hidden max-w-7xl mx-auto p-4 rounded-xl bg-rose-950/80 border border-rose-700 text-rose-200 text-xs font-mono shadow-xl flex items-start gap-3">
+      <i class="fa-solid fa-triangle-exclamation text-rose-400 text-lg mt-0.5"></i>
+      <div class="space-y-1">
+        <div class="font-bold text-rose-300 text-sm">FALHA DE COMUNICAÇÃO: SERVIDOR FASTAPI DESCONECTADO (PORTA 8000)</div>
+        <p>O navegador não conseguiu contactar a rota <code class="bg-black/40 px-1 py-0.5 rounded text-rose-300">http://127.0.0.1:8000/predict</code>.</p>
+        <p class="text-slate-300">Certifique-se de que o Uvicorn está a correr no terminal da pasta raiz com o comando:</p>
+        <div class="bg-black/60 p-2 rounded text-emerald-400 font-bold select-all mt-1">
+          python -m uvicorn src.api:app --host 127.0.0.1 --port 8000 --reload
+        </div>
+      </div>
+    </div>
 
     <!-- SEÇÃO 3: RESULTADOS E DIAGNÓSTICO FINAL (3 COLUNAS) -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -420,8 +442,8 @@
         </div>
 
         <div class="mt-4 pt-3 border-t border-scada-border text-[11px] text-slate-500 flex items-center justify-between font-mono">
-          <span>Latência: <strong id="valor-latencia" class="text-slate-300">12ms</strong></span>
-          <span>Origem: <strong id="valor-origem-inferencia" class="text-slate-300">Motor Local SCADA</strong></span>
+          <span>Latência: <strong id="valor-latencia" class="text-slate-300">--</strong></span>
+          <span>Origem: <strong id="valor-origem-inferencia" class="text-slate-300">Aguardando Execução...</strong></span>
         </div>
       </section>
 
@@ -473,6 +495,10 @@
       inicializarGrafico();
       carregarPreset('normal');
       atualizarSeveridadeDinamica();
+      verificarStatusApi();
+
+      // Verificação de saúde da API a cada 5 segundos
+      setInterval(verificarStatusApi, 5000);
 
       // Sliders
       document.getElementById('slider-sensibilidade').addEventListener('input', function(e) {
@@ -499,7 +525,43 @@
       // Atualiza severidade em tempo real
       document.getElementById('sensor-vib').addEventListener('input', atualizarSeveridadeDinamica);
       document.getElementById('sensor-rpm').addEventListener('input', atualizarSeveridadeDinamica);
+      document.getElementById('api-endpoint').addEventListener('change', verificarStatusApi);
     };
+
+    // VERIFICADOR DE CONEXÃO COM O UVICORN (GET /health)
+    async function verificarStatusApi() {
+      const endpoint = document.getElementById('api-endpoint').value.trim();
+      const dot = document.getElementById('api-ping-dot');
+      const badge = document.getElementById('api-status-badge');
+      const banner = document.getElementById('banner-erro-api');
+
+      let urlBase = endpoint.replace(/\/predict.*$/, '');
+      const healthUrl = `${urlBase}/health`;
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+        const res = await fetch(healthUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const dados = await res.json();
+          dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
+          badge.className = "text-emerald-400 font-mono font-bold";
+          badge.innerText = `API: ONLINE (${dados.versao_api || '8000'})`;
+          banner.classList.add('hidden');
+          return true;
+        } else {
+          throw new Error("HTTP " + res.status);
+        }
+      } catch (err) {
+        dot.className = "w-2.5 h-2.5 rounded-full bg-rose-500";
+        badge.className = "text-rose-400 font-mono font-bold";
+        badge.innerText = "API: OFFLINE (Porta 8000)";
+        return false;
+      }
+    }
 
     function atualizarSeveridadeDinamica() {
       const vib = parseFloat(document.getElementById('sensor-vib').value) || 0;
@@ -517,30 +579,24 @@
 
       ctx.clearRect(0, 0, w, h);
 
-      // Fundo escuro industrial
       ctx.fillStyle = '#0a101f';
       ctx.fillRect(0, 0, w, h);
 
-      // Carcaça externa da bancada
       ctx.strokeStyle = '#334155';
       ctx.lineWidth = 2;
       ctx.strokeRect(10, 45, 280, 130);
 
-      // EIXO CENTRAL DE TRANSMISSÃO
       ctx.fillStyle = '#64748b';
       ctx.fillRect(5, 102, 290, 16);
       ctx.strokeStyle = '#94a3b8';
       ctx.strokeRect(5, 102, 290, 16);
 
-      // ========================================================
-      // 1. ZONA DO ROLAMENTO / MANCAL (ROI 1: X=15 a 95)
-      // ========================================================
+      // ROI 1: ROLAMENTO (X=15 a 95)
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(25, 65, 60, 90);
       ctx.strokeStyle = '#475569';
       ctx.strokeRect(25, 65, 60, 90);
 
-      // Esferas do rolamento
       const esferasY = [78, 100, 122, 142];
       esferasY.forEach(y => {
         ctx.beginPath();
@@ -551,7 +607,6 @@
         ctx.stroke();
       });
 
-      // Se houver falha no rolamento, desenha microfissuras e atrito
       if (falhaTipo === 'rolamento') {
         ctx.strokeStyle = '#f8fafc';
         ctx.lineWidth = 2;
@@ -567,31 +622,25 @@
         }
       }
 
-      // ========================================================
-      // 2. ZONA DO ROTOR E NÚCLEO MAGNÉTICO (ROI 2: X=95 a 205)
-      // ========================================================
+      // ROI 2: ROTOR (X=95 a 205)
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(105, 58, 90, 104);
       ctx.strokeStyle = '#475569';
       ctx.strokeRect(105, 58, 90, 104);
 
-      // Ranhuras magnéticas do rotor
       for (let rx = 115; rx <= 185; rx += 14) {
         ctx.fillStyle = '#334155';
         ctx.fillRect(rx, 62, 8, 96);
       }
 
-      // Bobinagem de cobre nas extremidades
       ctx.fillStyle = '#b45309';
       ctx.fillRect(100, 70, 6, 80);
       ctx.fillRect(194, 70, 6, 80);
 
-      // Se houver falha no rotor (desbalanceamento / raspagem)
       if (falhaTipo === 'rotor') {
         ctx.strokeStyle = '#f8fafc';
         ctx.lineWidth = 2.5;
         ctx.beginPath();
-        // Ranhura profunda excêntrica
         ctx.moveTo(110, 80); ctx.lineTo(185, 95);
         ctx.moveTo(115, 125); ctx.lineTo(180, 140);
         ctx.stroke();
@@ -602,9 +651,7 @@
         }
       }
 
-      // ========================================================
-      // 3. ZONA DAS PÁS DO IMPULSOR / VOLUTA (ROI 3: X=205 a 285)
-      // ========================================================
+      // ROI 3: PÁS DA TURBINA (X=205 a 285)
       ctx.fillStyle = '#1e293b';
       ctx.beginPath();
       ctx.arc(245, 110, 42, 0, Math.PI * 2);
@@ -612,7 +659,6 @@
       ctx.strokeStyle = '#475569';
       ctx.stroke();
 
-      // Desenho das pás curvas da turbina
       for (let a = 0; a < 6; a++) {
         let ang = (a * Math.PI) / 3;
         ctx.beginPath();
@@ -622,40 +668,33 @@
         ctx.stroke();
       }
 
-      // Se houver cavitação nas pás (erosão e pitting)
       if (falhaTipo === 'pas') {
         ctx.strokeStyle = '#f8fafc';
         ctx.lineWidth = 2.5;
         ctx.beginPath();
-        // Aresta quebrada da pá
         ctx.moveTo(230, 95); ctx.lineTo(260, 85);
         ctx.moveTo(235, 125); ctx.lineTo(265, 135);
         ctx.stroke();
 
-        // Erosão por microbolhas de cavitação
         ctx.fillStyle = '#f1f5f9';
         for (let k = 0; k < 45; k++) {
           ctx.fillRect(220 + Math.random() * 50, 80 + Math.random() * 60, 2, 2);
         }
       }
 
-      // Se for o canvas da peça em teste, desenha as Bounding Boxes identificadoras
       if (canvasId === 'canvas-amostra' || canvasId === 'canvas-gabarito') {
         ctx.lineWidth = 1;
-        // ROI 1: Rolamento
         ctx.strokeStyle = '#f59e0b';
         ctx.strokeRect(15, 50, 80, 120);
         ctx.fillStyle = '#f59e0b';
         ctx.font = '9px Consolas, monospace';
         ctx.fillText('ROI 1: ROLAMENTO', 17, 44);
 
-        // ROI 2: Rotor
         ctx.strokeStyle = '#38bdf8';
         ctx.strokeRect(95, 50, 110, 120);
         ctx.fillStyle = '#38bdf8';
         ctx.fillText('ROI 2: ROTOR', 120, 44);
 
-        // ROI 3: Pás
         ctx.strokeStyle = '#f43f5e';
         ctx.strokeRect(205, 50, 80, 120);
         ctx.fillStyle = '#f43f5e';
@@ -665,7 +704,6 @@
 
     // CARREGAR PRESETS INDUSTRIAIS
     function carregarPreset(tipo) {
-      // Sempre desenha gabarito perfeito
       desenharMotorEsquematico('canvas-gabarito', null);
 
       if (tipo === 'normal') {
@@ -682,21 +720,21 @@
         document.getElementById('sensor-vib').value = '9.8';
         document.getElementById('sensor-pressao').value = '4.1';
         document.getElementById('sensor-rpm').value = '3010';
-        document.getElementById('sensor-acustica').value = '82.5'; // Ruído ultrassônico característico
+        document.getElementById('sensor-acustica').value = '82.5';
         document.getElementById('sensor-corrente').value = '31.0';
       } else if (tipo === 'rotor') {
         desenharMotorEsquematico('canvas-amostra', 'rotor');
         document.getElementById('sensor-temp').value = '68.0';
-        document.getElementById('sensor-vib').value = '11.5';     // Vibração severa por excentricidade
+        document.getElementById('sensor-vib').value = '11.5';
         document.getElementById('sensor-pressao').value = '4.2';
         document.getElementById('sensor-rpm').value = '3050';
         document.getElementById('sensor-acustica').value = '56.0';
-        document.getElementById('sensor-corrente').value = '47.5'; // Sobrecarga elétrica no motor
+        document.getElementById('sensor-corrente').value = '47.5';
       } else if (tipo === 'pas') {
         desenharMotorEsquematico('canvas-amostra', 'pas');
-        document.getElementById('sensor-temp').value = '99.5';     // Salto térmico crítico
+        document.getElementById('sensor-temp').value = '99.5';
         document.getElementById('sensor-vib').value = '3.5';
-        document.getElementById('sensor-pressao').value = '1.8';   // Perda severa de pressão lubrificante
+        document.getElementById('sensor-pressao').value = '1.8';
         document.getElementById('sensor-rpm').value = '3020';
         document.getElementById('sensor-acustica').value = '55.0';
         document.getElementById('sensor-corrente').value = '29.5';
@@ -704,10 +742,8 @@
 
       atualizarSeveridadeDinamica();
       processarInspecaoVisual();
-      executarAuditoriaCompleta();
     }
 
-    // PROCESSAR ARQUIVO EXTERNO ENVIADO PELO USUÁRIO
     function carregarImagemArquivo(file, canvasId) {
       if (!file) return;
       const reader = new FileReader();
@@ -760,7 +796,6 @@
             Math.abs(imgG.data[idx+2] - imgA.data[idx+2])
           ) / 3;
 
-          // Identifica a qual ROI o pixel pertence
           let roiChave = null;
           if (x >= ROIS.rolamento.x1 && x < ROIS.rolamento.x2 && y >= 50 && y <= 170) roiChave = 'rolamento';
           else if (x >= ROIS.rotor.x1 && x < ROIS.rotor.x2 && y >= 50 && y <= 170) roiChave = 'rotor';
@@ -773,13 +808,11 @@
           if (diff > sensibilidade) {
             if (roiChave) pixelsDanoROI[roiChave]++;
 
-            // Painel 3: Granulado Branco sobre Fundo Escuro
             imgD.data[idx] = 255;
             imgD.data[idx+1] = 255;
             imgD.data[idx+2] = 255;
             imgD.data[idx+3] = 255;
 
-            // Painel 4: Overlay em Vermelho Brilhante
             imgO.data[idx] = 244;
             imgO.data[idx+1] = 63;
             imgO.data[idx+2] = 94;
@@ -796,7 +829,6 @@
       ctxD.putImageData(imgD, 0, 0);
       ctxO.putImageData(imgO, 0, 0);
 
-      // Atualiza percentuais por ROI
       ROIS.rolamento.dano = (pixelsDanoROI.rolamento / Math.max(1, pixelsTotalROI.rolamento)) * 100;
       ROIS.rotor.dano     = (pixelsDanoROI.rotor / Math.max(1, pixelsTotalROI.rotor)) * 100;
       ROIS.pas.dano       = (pixelsDanoROI.pas / Math.max(1, pixelsTotalROI.pas)) * 100;
@@ -804,7 +836,6 @@
       atualizarTabelaLaudo(tolerancia);
     }
 
-    // ATUALIZAR TABELA DE LAUDO DAS 3 ROIs
     function atualizarTabelaLaudo(tolerancia) {
       const r1 = document.getElementById('roi1-dano');
       const r2 = document.getElementById('roi2-dano');
@@ -848,7 +879,6 @@
       }
     }
 
-    // BAIXAR CANVAS EM PNG
     function baixarCanvas(id, nome) {
       const cv = document.getElementById(id);
       const a = document.createElement('a');
@@ -857,7 +887,6 @@
       a.click();
     }
 
-    // INICIALIZAR GRÁFICO DE PROBABILIDADES DAS 4 CLASSES
     function inicializarGrafico() {
       const ctx = document.getElementById('grafico-probabilidades').getContext('2d');
       chartProbabilidades = new Chart(ctx, {
@@ -907,7 +936,7 @@
             legend: { display: false },
             tooltip: {
               callbacks: {
-                label: function(c) { return c.raw.toFixed(2) + '%'; }
+                label: function(c) { return c.raw.toFixed(1) + '%'; }
               }
             }
           }
@@ -915,10 +944,11 @@
       });
     }
 
-    // DISPARO DA AUDITORIA COMPLETA (FUSÃO VISÃO + TELEMETRIA IOT + API)
+    // DISPARO DA AUDITORIA COMPLETA - EXIGE SERVIDOR FASTAPI (PORTA 8000)
     async function executarAuditoriaCompleta() {
       const t0 = performance.now();
-      const endpoint = document.getElementById('api-endpoint').value;
+      const endpoint = document.getElementById('api-endpoint').value.trim();
+      const bannerErro = document.getElementById('banner-erro-api');
 
       const temp = parseFloat(document.getElementById('sensor-temp').value);
       const vib = parseFloat(document.getElementById('sensor-vib').value);
@@ -928,7 +958,7 @@
       const corrente = parseFloat(document.getElementById('sensor-corrente').value);
       const severidade = vib / rpm;
 
-      // Payload compatível com a API FastAPI da AeroMotion Dynamics
+      // Payload compatível com as 16 variáveis da API
       const payload = {
         horas_operacao_acumuladas: 2450.0,
         temperatura_mancal_c: temp,
@@ -948,45 +978,87 @@
         severidade_dinamica: severidade
       };
 
-      let resposta = null;
-      let origem = 'FastAPI Local (Porta 8000)';
-
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+
         const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
+          signal: controller.signal
         });
-        if (!res.ok) throw new Error('Status ' + res.status);
-        resposta = await res.json();
-      } catch (e) {
-        origem = 'Motor Local SCADA (Modo Offline Air-Gapped)';
-        resposta = simularRandomForestOffline(payload);
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          throw new Error(`Servidor respondeu com código HTTP ${res.status}`);
+        }
+
+        const respostaApi = await res.json();
+        const t1 = performance.now();
+
+        bannerErro.classList.add('hidden');
+        document.getElementById('valor-latencia').innerText = Math.round(t1 - t0) + 'ms';
+        document.getElementById('valor-origem-inferencia').innerHTML = '<span class="text-emerald-400 font-bold">FastAPI Local (Porta 8000)</span>';
+
+        // Executa a fusão utilizando fielmente res.probabilidades (Random Forest da API)
+        aplicarFusaoMultimodal(respostaApi, payload, 'FastAPI Local (Porta 8000)');
+
+      } catch (err) {
+        // NÃO roda em falso: trava e acusa que a API está desligada
+        console.error("Falha ao comunicar com a API:", err);
+
+        document.getElementById('valor-latencia').innerText = '--';
+        document.getElementById('valor-origem-inferencia').innerHTML = '<span class="text-rose-400 font-bold">ERRO: API Desconectada</span>';
+        bannerErro.classList.remove('hidden');
+
+        document.getElementById('display-diagnostico-titulo').className = 'p-3 rounded-lg bg-scada-card border border-rose-500 text-rose-400 font-bold text-sm flex items-center justify-between font-mono';
+        document.getElementById('display-diagnostico-titulo').innerHTML = `<span>ERRO: Backend Inacessível</span><i class="fa-solid fa-plug-circle-xmark"></i>`;
+        document.getElementById('display-recomendacao').innerText = 'Falha de comunicação com o servidor Uvicorn em http://127.0.0.1:8000. Inicie o servidor Python no terminal para obter a inferência real do modelo.';
+
+        document.getElementById('terminal-json').innerText = `// ERRO DE REDE: ${err.message}\n// Certifique-se de que o Uvicorn está em execução:\n// python -m uvicorn src.api:app --host 127.0.0.1 --port 8000 --reload`;
       }
-
-      const t1 = performance.now();
-      document.getElementById('valor-latencia').innerText = Math.round(t1 - t0) + 'ms';
-      document.getElementById('valor-origem-inferencia').innerText = origem;
-
-      // FUSÃO MULTIMODAL:
-      // O dano de cada ROI da visão atua diretamente na respectiva classe de falha
-      aplicarFusaoMultimodal(resposta, payload, origem);
     }
 
-    // MOTOR OFFLINE EQUIVALENTE AO MODELO RANDOM FOREST TREINADO
+    // DISPARO OPCIONAL MANUAL DE CONTINGÊNCIA (SÓ EXECUTA SE CLICAR NO BOTÃO MODO OFFLINE)
+    function executarContingenciaOffline() {
+      const t0 = performance.now();
+      const temp = parseFloat(document.getElementById('sensor-temp').value);
+      const vib = parseFloat(document.getElementById('sensor-vib').value);
+      const pressao = parseFloat(document.getElementById('sensor-pressao').value);
+      const rpm = parseFloat(document.getElementById('sensor-rpm').value);
+      const acustica = parseFloat(document.getElementById('sensor-acustica').value);
+      const corrente = parseFloat(document.getElementById('sensor-corrente').value);
+
+      const payload = {
+        horas_operacao_acumuladas: 2450.0,
+        temperatura_mancal_c: temp,
+        vibracao_rms_mms: vib,
+        pressao_oleo_bar: pressao,
+        rotacao_rpm: rpm,
+        emissao_acustica_db: acustica,
+        corrente_eletrica_amp: corrente,
+        severidade_dinamica: vib / rpm
+      };
+
+      const respostaSimulada = simularRandomForestOffline(payload);
+      const t1 = performance.now();
+
+      document.getElementById('valor-latencia').innerText = Math.round(t1 - t0) + 'ms';
+      document.getElementById('valor-origem-inferencia').innerHTML = '<span class="text-amber-400 font-bold">Motor Local SCADA (Modo Offline Air-Gapped)</span>';
+      document.getElementById('banner-erro-api').classList.add('hidden');
+
+      aplicarFusaoMultimodal(respostaSimulada, payload, 'Motor Local SCADA (Modo Offline Air-Gapped)');
+    }
+
     function simularRandomForestOffline(p) {
       let probs = [0.95, 0.02, 0.02, 0.01];
 
-      // Regra Falsa 3: Cavitação e Térmica
       if (p.temperatura_mancal_c > 88 || p.pressao_oleo_bar < 2.6) {
         probs = [0.03, 0.03, 0.04, 0.90];
-      }
-      // Regra Falsa 1: Desgaste de Rolamento
-      else if (p.emissao_acustica_db > 75 || (p.vibracao_rms_mms > 7.0 && p.corrente_eletrica_amp < 36)) {
+      } else if (p.emissao_acustica_db > 75 || (p.vibracao_rms_mms > 7.0 && p.corrente_eletrica_amp < 36)) {
         probs = [0.04, 0.91, 0.03, 0.02];
-      }
-      // Regra Falsa 2: Desbalanceamento de Rotor
-      else if (p.vibracao_rms_mms > 8.0 && p.corrente_eletrica_amp > 38) {
+      } else if (p.vibracao_rms_mms > 8.0 && p.corrente_eletrica_amp > 38) {
         probs = [0.03, 0.04, 0.90, 0.03];
       }
 
@@ -1001,16 +1073,20 @@
       };
     }
 
-    // FUSÃO MULTIMODAL MATEMÁTICA
+    // =========================================================================
+    // FUSÃO MULTIMODAL VERDADEIRA (API FASTAPI + AJUSTE PROPORCIONAL DA VISÃO)
+    // =========================================================================
     function aplicarFusaoMultimodal(res, payload, origem) {
+      // 1. INICIALIZAÇÃO BASEADA NO MODELO DA API (res.probabilidades)
       let probs = [...res.probabilidades];
       const tolerancia = parseFloat(document.getElementById('slider-tolerancia').value);
 
-      // Ponderadores da Visão por ROI
-      const pesoRolamento = Math.min(ROIS.rolamento.dano / 10.0, 0.8);
-      const pesoRotor     = Math.min(ROIS.rotor.dano / 10.0, 0.8);
-      const pesoPas       = Math.min(ROIS.pas.dano / 10.0, 0.8);
+      // 2. Ponderadores proporcionais da visão calculados a partir dos danos medidos
+      const pesoRolamento = Math.min((ROIS.rolamento.dano / 10.0), 0.85);
+      const pesoRotor     = Math.min((ROIS.rotor.dano / 10.0), 0.85);
+      const pesoPas       = Math.min((ROIS.pas.dano / 10.0), 0.85);
 
+      // 3. Aplica o peso de cada falha visual que ultrapassa a tolerância da ROI
       if (ROIS.rolamento.dano > tolerancia) {
         probs[1] += pesoRolamento;
         probs[0] = Math.max(0.01, probs[0] - pesoRolamento);
@@ -1024,15 +1100,15 @@
         probs[0] = Math.max(0.01, probs[0] - pesoPas);
       }
 
-      // Normalização da soma para 100%
+      // 4. Normalização da soma para 100% exato
       const soma = probs.reduce((a, b) => a + b, 0);
       probs = probs.map(p => (p / soma) * 100);
 
-      // Atualiza Chart.js
+      // Atualiza o gráfico Chart.js
       chartProbabilidades.data.datasets[0].data = probs;
       chartProbabilidades.update();
 
-      // Classe Campeã Pós-Fusão
+      // Determinação da classe vencedora
       const maxProb = Math.max(...probs);
       const classeFinal = probs.indexOf(maxProb);
 
@@ -1042,7 +1118,8 @@
       const bClp = document.getElementById('badge-clp-status');
       const dDet = document.getElementById('display-detalhe-ponderado');
 
-      const riscoGlobal = 100 - probs[0];
+      // Risco Composto Global (Complemento da Operação Normal)
+      const riscoGlobal = Math.max(0.4, 100.0 - probs[0]);
       dProb.innerText = `${riscoGlobal.toFixed(1)}%`;
 
       if (classeFinal === 0) {
@@ -1103,19 +1180,14 @@
       document.getElementById('terminal-json').innerText = JSON.stringify(logFinal, null, 2);
     }
 
-    // COPIAR LOG JSON
     function copiarJsonTerminal() {
       const txt = document.getElementById('terminal-json').innerText;
-      const t = document.createElement('textarea');
-      t.value = txt;
-      document.body.appendChild(t);
-      t.select();
-      document.execCommand('copy');
-      document.body.removeChild(t);
-      const badge = document.getElementById('api-status-badge');
-      const original = badge.innerText;
-      badge.innerText = 'LOG COPIADO!';
-      setTimeout(() => { badge.innerText = original; }, 2000);
+      navigator.clipboard.writeText(txt).then(() => {
+        const badge = document.getElementById('api-status-badge');
+        const original = badge.innerText;
+        badge.innerText = 'LOG COPIADO!';
+        setTimeout(() => { badge.innerText = original; }, 2000);
+      });
     }
   </script>
 </body>
