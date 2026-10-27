@@ -6,8 +6,10 @@ import pandas as pd
 import numpy as np
 import os
 import json
+import sys
 
 # Importação das rotinas de visão computacional
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from computer_vision import inspecionar_motor_completo
 
 # Inicialização da API
