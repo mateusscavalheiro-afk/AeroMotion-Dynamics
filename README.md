@@ -544,7 +544,7 @@ jupyter notebook
 
 Inicie o servidor Uvicorn com recarregamento automático:
 ```bash
-uvicorn src.api:app --host 127.0.0.1 --port 8000 --reload
+python -m uvicorn src.api:app --host 127.0.0.1 --port 8000 --reload 
 ```
 
 * **Documentação Interativa Swagger UI:** Acesse via navegador em `http://127.0.0.1:8000/docs`
