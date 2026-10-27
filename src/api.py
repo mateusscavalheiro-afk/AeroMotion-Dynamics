@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
+from fastapi.middleware.cors import CORSMiddleware
 import joblib
 import pandas as pd
 import numpy as np
@@ -17,6 +18,14 @@ app = FastAPI(
     title="AeroMotion Dynamics - Predictive Maintenance API",
     description="Microsserviço RESTful para inferência de falhas mecânicas e inspeção visual multimodal.",
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Caminho dos artefactos de IA serializados
